@@ -5,8 +5,6 @@ const jwtGenerator = require("../utils/jwtGenerator");
 const validInfo = require("../middleware/validInfo");
 const authorization = require("../middleware/authorization");
 const { encrypt, decrypt } = require("../middleware/encrypt");
-const jwtOtp = require("../utils/jwtotp");
-const otpauthorize = require("../middleware/otpauthorize");
 
 router.post("/register", validInfo, async (req, res) => {
   try {
@@ -72,33 +70,18 @@ router.get("/is-verify", authorization, (req, res) => {
   }
 });
 
-router.get("/otp-verify", otpauthorize, (req, res) => {
-  try {
-    res.json(true);
-  } catch (err) {
-    console.error(err.message);
-    res.status(500).send("Server Error");
-  }
-});
-
 router.post("/encrypted", async (req, res) => {
   try {
     const { message, id } = req.body;
 
-    // const user = await pool.query(
-    //   "UPDATE USERS SET message=($1) WHERE id=($2) RETURNING*",
-    //   [message, id]
-    // );
-    //"INSERT INTO Hash (id,encrypt_iv,encrypt_content,otp) VALUES($1,$2,$3,$4) RETURNING*",
     const hash = encrypt(message);
     const otp = Math.floor(100000 + Math.random() * 900000);
     const user = await pool.query(
       "UPDATE USERS SET encrypt_iv=($1),encrypt_content=($2),otp=($3) WHERE id=($4) RETURNING*",
       [hash.iv, hash.content, otp, id]
     );
-    const token2 = jwtOtp(otp);
     const token = Math.floor(100000 + Math.random() * 90000000000000);
-    res.json({ otp, token, token2 });
+    res.json({ otp, token });
   } catch (err) {
     console.error(err.message);
     res.status(500).send("Server Error");
@@ -111,10 +94,6 @@ router.post("/decrypted", async (req, res) => {
     const user = await pool.query("SELECT * FROM USERS WHERE otp=($1)", [otp]);
     const text = decrypt(user.rows[0].encrypt_iv, user.rows[0].encrypt_content);
     res.json({ text });
-    // const newuser = await pool.query(
-    //   "UPDATE USERS SET encrypt_iv='',encrypt_content='',otp=0 where id=($1)",
-    //   [id]
-    // );
   } catch (err) {
     console.error(err.message);
     res.status(500).send("Server Error");
